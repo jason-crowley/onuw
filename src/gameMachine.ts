@@ -16,6 +16,15 @@ interface GameContext {
   roles: Role[];
 }
 
+function shuffle<T>(array: T[]): T[] {
+  const shuffled = [...array];
+  for (let i = array.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
 const createGameMachine = (roles: Role[]) =>
   Machine<GameContext, GameStateSchema, GameEvent>(
     {
