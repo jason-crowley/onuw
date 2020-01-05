@@ -31,6 +31,7 @@ module.exports = {
         trailingComma: 'all',
       },
     ],
+    'import/extensions': 'off',
     '@typescript-eslint/explicit-function-return-type': 'off',
     '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
   },
