@@ -1,4 +1,5 @@
-import { Machine, assign, send } from 'xstate';
+import { Machine, assign, forwardTo } from 'xstate';
+import { CardId } from './types';
 import createNightMachine from './nightMachine';
 
 interface GameStateSchema {
@@ -13,7 +14,7 @@ interface GameStateSchema {
 type GameEvent = { type: 'NEXT' } | { type: 'VOTE' };
 
 interface GameContext {
-  roles: Role[];
+  cards: CardId[];
 }
 
 function shuffle<T>(array: T[]): T[] {
@@ -25,49 +26,62 @@ function shuffle<T>(array: T[]): T[] {
   return shuffled;
 }
 
-const createGameMachine = (roles: Role[]) =>
-  Machine<GameContext, GameStateSchema, GameEvent>(
-    {
-      id: 'game',
-      context: {
-        roles,
+export const gameMachine = Machine<GameContext, GameStateSchema, GameEvent>(
+  {
+    id: 'game',
+    context: {
+      cards: [],
+    },
+    initial: 'setup',
+    states: {
+      setup: {
+        on: {
+          '': {
+            target: 'night',
+            actions: ['shuffle', 'assign'],
+          },
+        },
       },
-      initial: 'setup',
-      states: {
-        setup: {
-          on: {
-            '': {
-              target: 'night',
-              actions: 'shuffle',
-            },
-          },
+      night: {
+        invoke: {
+          id: 'night',
+          src: 'nightMachine',
+          onDone: 'day',
         },
-        night: {
-          invoke: {
-            id: 'night',
-            src: createNightMachine(roles),
-            onDone: 'day',
-            data: { roles: (context: GameContext, event: GameEvent) => context.roles },
-          },
-          on: {
-            NEXT: { actions: send('NEXT', { to: 'night' }) },
-          },
+        on: {
+          NEXT: { actions: 'forwardToNight' },
         },
-        day: {
-          on: { VOTE: 'gameEnd' },
-        },
-        gameEnd: {
-          type: 'final',
-        },
+      },
+      day: {
+        on: { VOTE: 'gameEnd' },
+      },
+      gameEnd: {
+        type: 'final',
       },
     },
-    {
-      actions: {
-        shuffle: assign({ roles: context => context.roles }),
-        swap: assign({ roles: context => context.roles }),
-      },
-      guards: {},
+  },
+  {
+    actions: {
+      shuffle: assign({ cards: context => shuffle<CardId>(context.cards) }),
+      forwardToNight: forwardTo('night'),
+      swap: assign({ cards: context => context.cards }),
     },
-  );
+  },
+);
+
+const createGameMachine = (cards: CardId[]) => {
+  const createPlayers = () => [];
+
+  return gameMachine
+    .withContext({
+      ...gameMachine.context,
+      cards,
+    })
+    .withConfig({
+      services: {
+        nightMachine: context => createNightMachine(context.cards),
+      },
+    });
+};
 
 export default createGameMachine;

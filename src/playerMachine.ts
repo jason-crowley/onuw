@@ -1,6 +1,5 @@
-import { Machine, actions } from 'xstate';
-
-const { raise } = actions;
+import { Machine, assign } from 'xstate';
+import { CardId } from './types';
 
 interface PlayerStateSchema {
   states: {
@@ -13,29 +12,31 @@ interface PlayerStateSchema {
             awake: {};
           };
         };
-        role: {
-          states: {
-            [role in Role | 'noRole']: {};
-          };
-        };
       };
     };
   };
 }
 
-type AssignEvent = { type: 'ASSIGN'; role: Role };
+type AssignEvent = { type: 'ASSIGN'; card: CardId };
 type PlayerEvent = AssignEvent | { type: 'WAKE' } | { type: 'SLEEP' };
 
+interface PlayerContext {
+  card: CardId;
+}
+
 const createPlayerMachine = () =>
-  Machine(
+  Machine<PlayerContext, PlayerStateSchema, PlayerEvent>(
     {
       id: 'player',
+      // context: {
+      //   card: null,
+      // },
       initial: 'unassigned',
       states: {
         unassigned: {
           on: {
             ASSIGN: {
-              actions: 'assignRole',
+              actions: 'assignCard',
             },
           },
         },
@@ -49,28 +50,6 @@ const createPlayerMachine = () =>
                 awake: {},
               },
             },
-            role: {
-              initial: 'noRole',
-              states: {
-                noRole: {},
-                villager1: {},
-                villager2: {},
-                villager3: {},
-                werewolf1: {},
-                werewolf2: {},
-                seer: {},
-                robber: {},
-                troublemaker: {},
-                tanner: {},
-                drunk: {},
-                hunter: {},
-                mason1: {},
-                mason2: {},
-                insomniac: {},
-                minion: {},
-                // doppelganger: {},
-              },
-            },
           },
           on: {
             WAKE: '.sleep.awake',
@@ -81,7 +60,7 @@ const createPlayerMachine = () =>
     },
     {
       actions: {
-        assignRole: (context, event) => raise(`.role.${(event as AssignEvent).role}`),
+        assignCard: assign({ card: context => context.card }),
       },
     },
   );

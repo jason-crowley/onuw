@@ -1,92 +1,71 @@
-import { Machine, StatesConfig, actions } from 'xstate';
-
-const { raise } = actions;
+import { Machine } from 'xstate';
+import { Cards, NightWakeOrder, CardId, Role, WakeRole } from './types';
 
 interface NightStateSchema {
   states: {
-    // doppelganger: {},
-    // doppelMinion: {},
-    werewolf: {};
-    minion: {};
-    mason: {};
-    seer: {};
-    robber: {};
-    troublemaker: {};
-    drunk: {};
-    insomniac: {};
-    nightEnd: {};
+    [role in WakeRole | 'nightEnd']: {};
   };
 }
 
 type NightEvent = { type: 'NEXT' };
 
 interface NightContext {
-  roles: Role[];
+  cards: CardId[];
 }
 
-const createNightMachine = (roles: Role[]) => {
+// Construct nightStates
+let nightStates: Partial<NightStateSchema['states']> = { nightEnd: { type: 'final' } };
+for (let i = 0; i < NightWakeOrder.length; i += 1) {
+  const role: WakeRole = NightWakeOrder[i];
+  const nextRole = NightWakeOrder[i + 1];
+
+  nightStates = {
+    ...nightStates,
+    [role]: {
+      on: {
+        '': { target: nextRole, cond: `${role}NotInPlay` },
+        NEXT: nextRole || 'nightEnd',
+      },
+    },
+  };
+}
+
+export const nightMachine = Machine<NightContext, NightStateSchema, NightEvent>({
+  id: 'night',
+  context: {
+    cards: [],
+  },
+  initial: NightWakeOrder[0],
+  states: {
+    ...(nightStates as NightStateSchema['states']),
+  },
+});
+
+const createNightMachine = (cards: CardId[]) => {
   // TODO: change magic number 3 to account for Alpha Wolf
-  const numPlayers = roles.length - 3;
-  // TODO: ensure that we only consider player's INITIAL roles
-  const startRoles = new Set<Role>(roles.slice(0, numPlayers));
-  const hasNone = (..._roles: Role[]) => !_roles.some(role => startRoles.has(role));
+  const numPlayers = cards.length - 3;
+  const playerCards: CardId[] = cards.slice(0, numPlayers);
+  const startRoles = new Set<Role>(playerCards.map(card => Cards[card]));
+  const notInPlay = (role: WakeRole) => !startRoles.has(role);
 
-  // TODO: add doppel roles
-  const nightOrder = [
-    'werewolf',
-    'minion',
-    'mason',
-    'seer',
-    'robber',
-    'troublemaker',
-    'drunk',
-    'insomniac',
-    'nightEnd',
-  ];
-  // Construct nightStates
-  let nightStates: Partial<NightStateSchema['states']> = { nightEnd: { type: 'final' } };
-  for (let i = 0; i < nightOrder.length - 1; i += 1) {
-    const current = nightOrder[i];
-    const next = nightOrder[i + 1];
-    const capitalizedCurrent = current.charAt(0).toUpperCase() + current.slice(1);
-
-    nightStates = {
-      ...nightStates,
-      [current]: {
-        on: {
-          '': { target: next, cond: `no${capitalizedCurrent}` },
-          NEXT: next,
-        },
-      },
-    };
-  }
-
-  return Machine<NightContext, NightStateSchema, NightEvent>(
-    {
-      id: 'night',
-      context: {
-        roles,
-      },
-      initial: 'werewolf', // TODO: change when doppel added
-      states: {
-        // doppelganger: {},
-        // doppelMinion: {},
-        ...(nightStates as NightStateSchema['states']),
-      },
-    },
-    {
+  return nightMachine
+    .withContext({
+      ...nightMachine.context,
+      cards,
+    })
+    .withConfig({
       guards: {
-        noWerewolf: () => hasNone('werewolf1', 'werewolf2'),
-        noMinion: () => hasNone('minion'),
-        noMason: () => hasNone('mason1', 'mason2'),
-        noSeer: () => hasNone('seer'),
-        noRobber: () => hasNone('robber'),
-        noTroublemaker: () => hasNone('troublemaker'),
-        noDrunk: () => hasNone('drunk'),
-        noInsomniac: () => hasNone('insomniac'),
+        // doppelgangerNotInPlay: () => notInPlay('doppelganger'),
+        werewolfNotInPlay: () => notInPlay('werewolf'),
+        minionNotInPlay: () => notInPlay('minion'),
+        masonNotInPlay: () => notInPlay('mason'),
+        seerNotInPlay: () => notInPlay('seer'),
+        robberNotInPlay: () => notInPlay('robber'),
+        troublemakerNotInPlay: () => notInPlay('troublemaker'),
+        drunkNotInPlay: () => notInPlay('drunk'),
+        insomniacNotInPlay: () => notInPlay('insomniac'),
       },
-    },
-  );
+    });
 };
 
 export default createNightMachine;

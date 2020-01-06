@@ -1,14 +1,16 @@
 import { interpret } from 'xstate';
 import createGameMachine from './gameMachine';
 
-const gameMachine = createGameMachine(['werewolf1', 'robber', 'seer', 'troublemaker', 'werewolf2', 'mason2'] as Role[]);
+const gameMachine = createGameMachine([0, 1, 2, 4, 6, 13]);
 const service = interpret(gameMachine).onTransition(state => {
-  console.log(state.value);
+  if (state.changed) {
+    console.log(state.value);
+    console.log(state.context.cards);
+  }
 });
 
 service.start();
-service.children.get('night')!.send('NEXT' as any);
-service.children.get('night')!.send('NEXT' as any);
-service.children.get('night')!.send('NEXT' as any);
-service.children.get('night')!.send('NEXT' as any);
-service.children.get('night')!.send('NEXT' as any);
+service.send('NEXT' as any);
+service.send('NEXT' as any);
+service.send('NEXT' as any);
+service.send('VOTE' as any);
